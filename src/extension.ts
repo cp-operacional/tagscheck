@@ -54,31 +54,33 @@ export function activate(context: vscode.ExtensionContext) {
     });
 }
 
-function getDates(code : string) {
-    //code.matchAll(/.*(BETWEEN|between|>=|and|AND)( |\n)+(\d{6}|'\d{2}-\d{2}-\d{4}')( |\n).*/g);
-
+function getDates(code: string) {
     const gte_matches = code.matchAll(/.*(\>\=)( )+(\d{6}|\d{2}\/\d{2}\/\d{4}).*/g);
-    let dates : string[] = [];
+    let dates: string[] = [];
 
     for (const match of gte_matches) {
-        // O grupo 3 é o índice 3 no array match
+        if (match[0].trimStart().startsWith('--')) {
+            return "SEM PERIODO";
+        }
         dates.push(match[3]);
     }
 
     if (dates.length <= 0) {
         const between_matches = code.matchAll(/.*(BETWEEN|between)( |\n)+('|")?(\d{6}|\d{2}\/\d{2}\/\d{4})('|")?( |\n)+(AND|and)( |\n)+('|")?(\d{6}|\d{2}\/\d{2}\/\d{4})('|")?.*/g);
-        for (const match of between_matches) {      //between '23-23-2222' and '23-23-2222'
-            // O grupo 3 é o índice 3 no array match
+        for (const match of between_matches) {
+            if (match[0].trimStart().startsWith('--')) {
+                return "SEM PERIODO";
+            }
             dates.push(match[4]);
             dates.push(match[10]);
         }
     }
 
-    return dates.toString();
+    return dates.length > 0 ? dates.toString() : "SEM PERIODO";
 }
 //mostrar quantas queries tem no código queries = query.split(/UNION ALL|union all/), colocar periodos e criterios e quantidade para cada querie e total de cada querie
 
-function getTotalLimit(code : string) {
+function getTotalLimit(code: string) {
 
     const matches = code.matchAll(/.*(LIMIT|limit)( |\n)+([0-9\-]+)( |\n).*/g);
     let total = 0;
@@ -155,7 +157,6 @@ function filterLines(text: string): string {
 
 
 function getWebviewContent(code: string): string {
-
     const colorStyles = (code: string): string => {
         const colors = {
             'sql-keywords':  [
@@ -200,6 +201,11 @@ function getWebviewContent(code: string): string {
 
     let totalLimits = getTotalLimit(activeEditor?.document.getText() || '');
     let dates = getDates(activeEditor?.document.getText() || '');
+
+    // Create the period HTML based on the dates
+    let periodHtml = dates === "SEM PERIODO" 
+        ? '<h2>SEM PERÍODO</h2>'
+        : `<h2>Período: ${dates}</h2>`;
 
     return `
         <!DOCTYPE html>
@@ -248,11 +254,15 @@ function getWebviewContent(code: string): string {
                 .purple {
                     color: #cf00cf;
                 }
+                h2 {
+                    color: #ff6b6b; // You can adjust this color as needed
+                    margin-bottom: 10px;
+                }
             </style>
         </head>
         <body>
             <h1>Quantidade: ${totalLimits}</h1>
-            <h4>Período: ${dates}</h2>
+            ${periodHtml}
             <div id="code">${finalCode}</div>
         </body>
         </html>
